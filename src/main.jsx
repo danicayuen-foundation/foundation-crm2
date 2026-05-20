@@ -14,6 +14,8 @@ import {
 import { supabase } from "./supabase";
 import "./style.css";
 
+import { supabase } from "./supabase";
+
 const stages = [
   "New Lead",
   "Contacted",
@@ -89,6 +91,7 @@ function toDbCompany(company) {
 }
 
 function App() {
+  console.log("SUPABASE CONNECTED", supabase);
   const [contacts, setContacts] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
