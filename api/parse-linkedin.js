@@ -5,12 +5,16 @@ const client = new OpenAI({
 });
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Only POST requests allowed" });
-  }
-
   try {
-    const { image } = req.body;
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Only POST requests allowed" });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: "Missing OPENAI_API_KEY in Vercel" });
+    }
+
+    const { image } = req.body || {};
 
     if (!image) {
       return res.status(400).json({ error: "No image provided" });
@@ -24,12 +28,9 @@ export default async function handler(req, res) {
           content: [
             {
               type: "input_text",
-              text: `
-You are extracting CRM data from a LinkedIn profile screenshot.
+              text: `Extract CRM info from this LinkedIn screenshot.
 
-Return ONLY valid JSON. No markdown.
-
-Extract:
+Return ONLY valid JSON:
 {
   "name": "",
   "title": "",
@@ -37,13 +38,7 @@ Extract:
   "location": "",
   "linkedinUrl": "",
   "notes": ""
-}
-
-Rules:
-- If something is not visible, use an empty string.
-- For notes, write one short sentence about why this person may matter for Foundation's automotive manufacturing outreach.
-- Foundation is a humanoid robotics company targeting VP Operations, VP Engineering, automation, manufacturing, and industrial leadership.
-`
+}`
             },
             {
               type: "input_image",
@@ -54,13 +49,15 @@ Rules:
       ]
     });
 
-    const text = response.output_text || "{}";
-    const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const data = JSON.parse(cleaned);
+    const cleaned = response.output_text
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
-    return res.status(200).json(data);
+    return res.status(200).json(JSON.parse(cleaned));
   } catch (error) {
-    console.error(error);
+    console.error("PARSE LINKEDIN ERROR:", error);
+
     return res.status(500).json({
       error: "AI parsing failed",
       details: error.message
