@@ -30,6 +30,7 @@ const starterContacts = [
     location: "",
     linkedinUrl: "",
     status: "New Lead",
+    priority: "Medium",
     outreachDate: "2026-05-20",
     responseDate: "",
     followUpDate: "2026-05-24",
@@ -45,6 +46,7 @@ const starterCompanies = [
   {
     id: 1,
     name: "Magna International",
+    website: "",
     description: "Tier 1 automotive supplier with large-scale manufacturing operations.",
     industry: "Automotive Manufacturing",
     automationLevel: "Medium",
@@ -65,6 +67,8 @@ function App() {
   const [duplicateWarning, setDuplicateWarning] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const [newContact, setNewContact] = useState({
     name: "",
@@ -73,6 +77,7 @@ function App() {
     location: "",
     linkedinUrl: "",
     status: "New Lead",
+    priority: "Medium",
     outreachDate: today(),
     responseDate: "",
     followUpDate: "",
@@ -81,6 +86,7 @@ function App() {
 
   const [newCompany, setNewCompany] = useState({
     name: "",
+    website: "",
     description: "",
     industry: "Automotive Manufacturing",
     automationLevel: "",
@@ -90,22 +96,22 @@ function App() {
   });
 
   useEffect(() => {
-  const savedContacts = localStorage.getItem("foundationContacts");
-  const savedCompanies = localStorage.getItem("foundationCompanies");
+    const savedContacts = localStorage.getItem("foundationContacts");
+    const savedCompanies = localStorage.getItem("foundationCompanies");
 
-  if (savedContacts) {
-    setContacts(JSON.parse(savedContacts));
-  }
+    if (savedContacts) {
+      setContacts(JSON.parse(savedContacts));
+    }
 
-  if (savedCompanies) {
-    setCompanies(JSON.parse(savedCompanies));
-  }
-}, []);
+    if (savedCompanies) {
+      setCompanies(JSON.parse(savedCompanies));
+    }
+  }, []);
 
-useEffect(() => {
-  localStorage.setItem("foundationContacts", JSON.stringify(contacts));
-  localStorage.setItem("foundationCompanies", JSON.stringify(companies));
-}, [contacts, companies]);
+  useEffect(() => {
+    localStorage.setItem("foundationContacts", JSON.stringify(contacts));
+    localStorage.setItem("foundationCompanies", JSON.stringify(companies));
+  }, [contacts, companies]);
 
   const stats = useMemo(() => {
     return {
@@ -115,6 +121,24 @@ useEffect(() => {
       followUpsDue: contacts.filter((c) => c.followUpDate && c.followUpDate <= today()).length
     };
   }, [contacts, companies]);
+
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((contact) => {
+      const searchText =
+        `${contact.name} ${contact.title} ${contact.company} ${contact.notes}`.toLowerCase();
+
+      const matchesSearch = searchText.includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "All" || contact.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [contacts, searchTerm, statusFilter]);
+
+  const followUpsDue = useMemo(() => {
+    return contacts.filter(
+      (contact) => contact.followUpDate && contact.followUpDate <= today()
+    );
+  }, [contacts]);
 
   function isDuplicate(contactData) {
     return contacts.find((c) => {
@@ -148,6 +172,7 @@ useEffect(() => {
       ...contactData,
       id: Date.now(),
       status: contactData.status || "New Lead",
+      priority: contactData.priority || "Medium",
       outreachDate: contactData.outreachDate || today(),
       responseDate: contactData.responseDate || "",
       followUpDate: contactData.followUpDate || "",
@@ -170,6 +195,7 @@ useEffect(() => {
         {
           id: Date.now() + 1,
           name: contact.company,
+          website: "",
           description: "",
           industry: "Automotive Manufacturing",
           automationLevel: "",
@@ -192,6 +218,7 @@ useEffect(() => {
       location: "",
       linkedinUrl: "",
       status: "New Lead",
+      priority: "Medium",
       outreachDate: today(),
       responseDate: "",
       followUpDate: "",
@@ -237,6 +264,7 @@ useEffect(() => {
           location: data.location || "",
           linkedinUrl: data.linkedinUrl || "",
           status: "New Lead",
+          priority: "Medium",
           outreachDate: today(),
           responseDate: "",
           followUpDate: "",
@@ -266,17 +294,16 @@ useEffect(() => {
 
     setCompanies([{ ...newCompany, id: Date.now() }, ...companies]);
 
-   setNewCompany({
-  name: "",
-  website: "",
-  description: "",
-  industry: "Automotive Manufacturing",
-  automationLevel: "",
-  roboticsUsage: "",
-  strategicFit: "",
-  notes: ""
-});
-    
+    setNewCompany({
+      name: "",
+      website: "",
+      description: "",
+      industry: "Automotive Manufacturing",
+      automationLevel: "",
+      roboticsUsage: "",
+      strategicFit: "",
+      notes: ""
+    });
   }
 
   function updateContact(id, field, value) {
@@ -356,29 +383,30 @@ useEffect(() => {
   }
 
   function deleteContact(id) {
-  const updated = contacts.filter((contact) => contact.id !== id);
-  setContacts(updated);
+    const updated = contacts.filter((contact) => contact.id !== id);
+    setContacts(updated);
 
-  if (selectedContact?.id === id) {
-    setSelectedContact(updated[0] || null);
+    if (selectedContact?.id === id) {
+      setSelectedContact(updated[0] || null);
+    }
   }
-}
 
-function deleteCompany(id) {
-  setCompanies(companies.filter((company) => company.id !== id));
-}
+  function deleteCompany(id) {
+    setCompanies(companies.filter((company) => company.id !== id));
+  }
 
-function clearAllData() {
-  const confirmed = window.confirm("Are you sure you want to clear all CRM data?");
+  function clearAllData() {
+    const confirmed = window.confirm("Are you sure you want to clear all CRM data?");
 
-  if (!confirmed) return;
+    if (!confirmed) return;
 
-  setContacts([]);
-  setCompanies([]);
-  setSelectedContact(null);
-  localStorage.removeItem("foundationContacts");
-  localStorage.removeItem("foundationCompanies");
-}
+    setContacts([]);
+    setCompanies([]);
+    setSelectedContact(null);
+    localStorage.removeItem("foundationContacts");
+    localStorage.removeItem("foundationCompanies");
+  }
+
   function exportExcel() {
     const cleanContacts = contacts.map(({ timeline, ...contact }) => contact);
 
@@ -407,17 +435,17 @@ function clearAllData() {
         </div>
 
         <div>
-  <button className="primaryButton" onClick={exportExcel}>
-    <Download size={18} />
-    Export Excel
-  </button>
+          <button className="primaryButton" onClick={exportExcel}>
+            <Download size={18} />
+            Export Excel
+          </button>
 
-  <p className="saveStatus">Auto-saved in browser</p>
+          <p className="saveStatus">Auto-saved in browser</p>
 
-  <button className="dangerButton" onClick={clearAllData}>
-    Clear All Data
-  </button>
-</div>
+          <button className="dangerButton" onClick={clearAllData}>
+            Clear All Data
+          </button>
+        </div>
       </header>
 
       <section className="tickerGrid">
@@ -467,6 +495,12 @@ function clearAllData() {
               {stages.map((stage) => <option key={stage}>{stage}</option>)}
             </select>
 
+            <select value={newContact.priority} onChange={(e) => setNewContact({ ...newContact, priority: e.target.value })}>
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+            </select>
+
             <input type="date" value={newContact.outreachDate} onChange={(e) => setNewContact({ ...newContact, outreachDate: e.target.value })} />
             <input type="date" value={newContact.followUpDate} onChange={(e) => setNewContact({ ...newContact, followUpDate: e.target.value })} />
           </div>
@@ -484,6 +518,7 @@ function clearAllData() {
 
           <div className="formGrid">
             <input placeholder="Company Name" value={newCompany.name} onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })} />
+            <input placeholder="Website" value={newCompany.website} onChange={(e) => setNewCompany({ ...newCompany, website: e.target.value })} />
             <input placeholder="Industry" value={newCompany.industry} onChange={(e) => setNewCompany({ ...newCompany, industry: e.target.value })} />
             <input placeholder="Automation Level" value={newCompany.automationLevel} onChange={(e) => setNewCompany({ ...newCompany, automationLevel: e.target.value })} />
             <input placeholder="Robotics Usage" value={newCompany.roboticsUsage} onChange={(e) => setNewCompany({ ...newCompany, roboticsUsage: e.target.value })} />
@@ -498,6 +533,28 @@ function clearAllData() {
             Add Company
           </button>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Follow-Ups Due</h2>
+
+        {followUpsDue.length === 0 ? (
+          <p className="emptyText">No follow-ups due right now.</p>
+        ) : (
+          <div className="followUpGrid">
+            {followUpsDue.map((contact) => (
+              <div className="followUpCard" key={contact.id}>
+                <strong>{contact.name}</strong>
+                <span>{contact.title} · {contact.company}</span>
+                <p>Due: {contact.followUpDate}</p>
+
+                <button className="miniButton" onClick={() => recommendFollowUp(contact)}>
+                  Generate Follow-Up
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="card">
@@ -521,7 +578,24 @@ function clearAllData() {
       </section>
 
       <section className="card">
-        <h2>Contacts</h2>
+        <div className="sectionHeader">
+          <h2>Contacts</h2>
+
+          <div className="filterRow">
+            <input
+              placeholder="Search contacts, companies, titles..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option>All</option>
+              {stages.map((stage) => (
+                <option key={stage}>{stage}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="tableWrap">
           <table>
@@ -533,6 +607,7 @@ function clearAllData() {
                 <th>Location</th>
                 <th>LinkedIn</th>
                 <th>Status</th>
+                <th>Priority</th>
                 <th>Outreach Date</th>
                 <th>Response Date</th>
                 <th>Follow-Up</th>
@@ -541,7 +616,7 @@ function clearAllData() {
             </thead>
 
             <tbody>
-              {contacts.map((contact) => (
+              {filteredContacts.map((contact) => (
                 <tr key={contact.id} onClick={() => setSelectedContact(contact)}>
                   <td><input value={contact.name} onChange={(e) => updateContact(contact.id, "name", e.target.value)} /></td>
                   <td><input value={contact.title} onChange={(e) => updateContact(contact.id, "title", e.target.value)} /></td>
@@ -553,20 +628,27 @@ function clearAllData() {
                       {stages.map((stage) => <option key={stage}>{stage}</option>)}
                     </select>
                   </td>
+                  <td>
+                    <select value={contact.priority || "Medium"} onChange={(e) => updateContact(contact.id, "priority", e.target.value)}>
+                      <option>Low</option>
+                      <option>Medium</option>
+                      <option>High</option>
+                    </select>
+                  </td>
                   <td><input type="date" value={contact.outreachDate} onChange={(e) => updateContact(contact.id, "outreachDate", e.target.value)} /></td>
                   <td><input type="date" value={contact.responseDate} onChange={(e) => updateContact(contact.id, "responseDate", e.target.value)} /></td>
                   <td><input type="date" value={contact.followUpDate} onChange={(e) => updateContact(contact.id, "followUpDate", e.target.value)} /></td>
-                 <td>
-  <input value={contact.notes} onChange={(e) => updateContact(contact.id, "notes", e.target.value)} />
+                  <td>
+                    <input value={contact.notes} onChange={(e) => updateContact(contact.id, "notes", e.target.value)} />
 
-  <button className="miniButton" onClick={() => recommendFollowUp(contact)}>
-    AI Follow-Up
-  </button>
+                    <button className="miniButton" onClick={() => recommendFollowUp(contact)}>
+                      AI Follow-Up
+                    </button>
 
-  <button className="dangerButton" onClick={() => deleteContact(contact.id)}>
-    Delete
-  </button>
-</td>
+                    <button className="dangerButton" onClick={() => deleteContact(contact.id)}>
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -582,21 +664,24 @@ function clearAllData() {
             {companies.map((company) => (
               <div className="companyCard" key={company.id}>
                 <h3>{company.name}</h3>
+                {company.website && <p>{company.website}</p>}
                 <p>{company.description || "No description yet."}</p>
+
                 <div className="tagRow">
                   <span>{company.industry}</span>
                   <span>{company.automationLevel || "Automation TBD"}</span>
                   <span>{company.strategicFit || "Fit TBD"}</span>
                 </div>
+
                 <small>{company.notes}</small>
 
                 <button className="miniButton" onClick={() => summarizeCompany(company)}>
                   AI Company Summary
                 </button>
-                
+
                 <button className="dangerButton" onClick={() => deleteCompany(company.id)}>
-  Delete Company
-</button>
+                  Delete Company
+                </button>
               </div>
             ))}
           </div>
