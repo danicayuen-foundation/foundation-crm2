@@ -13,5 +13,6 @@
     "lucide-react": "latest",
     "xlsx": "latest",
     "openai": "latest"
+    "@supabase/supabase-js": "latest"
   }
 }
