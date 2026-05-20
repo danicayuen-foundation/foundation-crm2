@@ -432,3 +432,25 @@ td select {
 .miniButton:hover {
   background: #dbeafe;
 }
+.dangerButton {
+  margin-top: 8px;
+  border: none;
+  background: #fef2f2;
+  color: #dc2626;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dangerButton:hover {
+  background: #fee2e2;
+}
+
+.saveStatus {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+}
