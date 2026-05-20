@@ -11,6 +11,7 @@ import {
   Upload,
   Sparkles
 } from "lucide-react";
+import { supabase } from "./supabase";
 import "./style.css";
 
 const stages = [
@@ -21,54 +22,82 @@ const stages = [
   "Demo"
 ];
 
-const starterContacts = [
-  {
-    id: 1,
-    name: "Jordan Lee",
-    title: "VP Operations",
-    company: "Magna International",
-    location: "",
-    linkedinUrl: "",
-    status: "New Lead",
-    priority: "Medium",
-    outreachDate: "2026-05-20",
-    responseDate: "",
-    followUpDate: "2026-05-24",
-    notes: "Automotive manufacturing target.",
-    timeline: [
-      { date: "2026-05-20", action: "Contact added" },
-      { date: "2026-05-20", action: "Outreach started" }
-    ]
-  }
-];
-
-const starterCompanies = [
-  {
-    id: 1,
-    name: "Magna International",
-    website: "",
-    description: "Tier 1 automotive supplier with large-scale manufacturing operations.",
-    industry: "Automotive Manufacturing",
-    automationLevel: "Medium",
-    roboticsUsage: "Industrial robots / automation cells",
-    strategicFit: "High",
-    notes: "Good fit for humanoid robotics in labor-heavy production areas."
-  }
-];
-
 function today() {
   return new Date().toISOString().split("T")[0];
 }
 
+function fromDbContact(row) {
+  return {
+    id: row.id,
+    name: row.name || "",
+    title: row.title || "",
+    company: row.company || "",
+    location: row.location || "",
+    linkedinUrl: row.linkedin_url || "",
+    status: row.status || "New Lead",
+    priority: row.priority || "Medium",
+    outreachDate: row.outreach_date || "",
+    responseDate: row.response_date || "",
+    followUpDate: row.follow_up_date || "",
+    notes: row.notes || "",
+    timeline: row.timeline || []
+  };
+}
+
+function toDbContact(contact) {
+  return {
+    name: contact.name,
+    title: contact.title,
+    company: contact.company,
+    location: contact.location,
+    linkedin_url: contact.linkedinUrl,
+    status: contact.status,
+    priority: contact.priority,
+    outreach_date: contact.outreachDate,
+    response_date: contact.responseDate,
+    follow_up_date: contact.followUpDate,
+    notes: contact.notes,
+    timeline: contact.timeline || []
+  };
+}
+
+function fromDbCompany(row) {
+  return {
+    id: row.id,
+    name: row.name || "",
+    website: row.website || "",
+    description: row.description || "",
+    industry: row.industry || "",
+    automationLevel: row.automation_level || "",
+    roboticsUsage: row.robotics_usage || "",
+    strategicFit: row.strategic_fit || "",
+    notes: row.notes || ""
+  };
+}
+
+function toDbCompany(company) {
+  return {
+    name: company.name,
+    website: company.website,
+    description: company.description,
+    industry: company.industry,
+    automation_level: company.automationLevel,
+    robotics_usage: company.roboticsUsage,
+    strategic_fit: company.strategicFit,
+    notes: company.notes
+  };
+}
+
 function App() {
-  const [contacts, setContacts] = useState(starterContacts);
-  const [companies, setCompanies] = useState(starterCompanies);
-  const [selectedContact, setSelectedContact] = useState(starterContacts[0]);
+  const [contacts, setContacts] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [selectedContact, setSelectedContact] = useState(null);
   const [duplicateWarning, setDuplicateWarning] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
 
   const [newContact, setNewContact] = useState({
     name: "",
@@ -96,22 +125,33 @@ function App() {
   });
 
   useEffect(() => {
-    const savedContacts = localStorage.getItem("foundationContacts");
-    const savedCompanies = localStorage.getItem("foundationCompanies");
-
-    if (savedContacts) {
-      setContacts(JSON.parse(savedContacts));
-    }
-
-    if (savedCompanies) {
-      setCompanies(JSON.parse(savedCompanies));
-    }
+    loadData();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("foundationContacts", JSON.stringify(contacts));
-    localStorage.setItem("foundationCompanies", JSON.stringify(companies));
-  }, [contacts, companies]);
+  async function loadData() {
+    setLoading(true);
+
+    const { data: contactRows, error: contactError } = await supabase
+      .from("contacts")
+      .select("*")
+      .order("id", { ascending: false });
+
+    const { data: companyRows, error: companyError } = await supabase
+      .from("companies")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (contactError) alert(contactError.message);
+    if (companyError) alert(companyError.message);
+
+    const loadedContacts = (contactRows || []).map(fromDbContact);
+    const loadedCompanies = (companyRows || []).map(fromDbCompany);
+
+    setContacts(loadedContacts);
+    setCompanies(loadedCompanies);
+    setSelectedContact(loadedContacts[0] || null);
+    setLoading(false);
+  }
 
   const stats = useMemo(() => {
     return {
@@ -157,7 +197,7 @@ function App() {
     });
   }
 
-  function createContact(contactData, source) {
+  async function createContact(contactData, source) {
     if (!contactData.name || !contactData.company) return;
 
     const duplicate = isDuplicate(contactData);
@@ -170,46 +210,70 @@ function App() {
 
     const contact = {
       ...contactData,
-      id: Date.now(),
       status: contactData.status || "New Lead",
       priority: contactData.priority || "Medium",
       outreachDate: contactData.outreachDate || today(),
       responseDate: contactData.responseDate || "",
       followUpDate: contactData.followUpDate || "",
       timeline: [
-        { date: today(), action: source === "ai" ? "Contact created from LinkedIn screenshot" : "Contact added" },
+        {
+          date: today(),
+          action:
+            source === "ai"
+              ? "Contact created from LinkedIn screenshot"
+              : "Contact added"
+        },
         { date: today(), action: "Outreach started" }
       ]
     };
 
-    setContacts([contact, ...contacts]);
-    setSelectedContact(contact);
+    const { data, error } = await supabase
+      .from("contacts")
+      .insert([toDbContact(contact)])
+      .select()
+      .single();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const savedContact = fromDbContact(data);
+
+    setContacts([savedContact, ...contacts]);
+    setSelectedContact(savedContact);
     setDuplicateWarning("");
 
     const companyExists = companies.find(
-      (company) => company.name.toLowerCase() === contact.company.toLowerCase()
+      (company) => company.name.toLowerCase() === savedContact.company.toLowerCase()
     );
 
     if (!companyExists) {
-      setCompanies([
-        {
-          id: Date.now() + 1,
-          name: contact.company,
-          website: "",
-          description: "",
-          industry: "Automotive Manufacturing",
-          automationLevel: "",
-          roboticsUsage: "",
-          strategicFit: "",
-          notes: source === "ai" ? "Created automatically from LinkedIn screenshot." : ""
-        },
-        ...companies
-      ]);
+      const company = {
+        name: savedContact.company,
+        website: "",
+        description: "",
+        industry: "Automotive Manufacturing",
+        automationLevel: "",
+        roboticsUsage: "",
+        strategicFit: "",
+        notes: source === "ai" ? "Created automatically from LinkedIn screenshot." : ""
+      };
+
+      const { data: companyData, error: companyError } = await supabase
+        .from("companies")
+        .insert([toDbCompany(company)])
+        .select()
+        .single();
+
+      if (!companyError && companyData) {
+        setCompanies([fromDbCompany(companyData), ...companies]);
+      }
     }
   }
 
-  function addContact() {
-    createContact(newContact, "manual");
+  async function addContact() {
+    await createContact(newContact, "manual");
 
     setNewContact({
       name: "",
@@ -277,7 +341,7 @@ function App() {
           return;
         }
 
-        createContact(aiContact, "ai");
+        await createContact(aiContact, "ai");
         setAiMessage("LinkedIn screenshot parsed and contact added.");
       } catch (error) {
         setAiMessage(error.message);
@@ -289,10 +353,21 @@ function App() {
     reader.readAsDataURL(file);
   }
 
-  function addCompany() {
+  async function addCompany() {
     if (!newCompany.name) return;
 
-    setCompanies([{ ...newCompany, id: Date.now() }, ...companies]);
+    const { data, error } = await supabase
+      .from("companies")
+      .insert([toDbCompany(newCompany)])
+      .select()
+      .single();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setCompanies([fromDbCompany(data), ...companies]);
 
     setNewCompany({
       name: "",
@@ -306,7 +381,7 @@ function App() {
     });
   }
 
-  function updateContact(id, field, value) {
+  async function updateContact(id, field, value) {
     const updated = contacts.map((contact) => {
       if (contact.id !== id) return contact;
 
@@ -318,7 +393,7 @@ function App() {
       return {
         ...contact,
         [field]: value,
-        timeline: [...contact.timeline, ...timelineItem]
+        timeline: [...(contact.timeline || []), ...timelineItem]
       };
     });
 
@@ -326,6 +401,13 @@ function App() {
 
     const active = updated.find((c) => c.id === id);
     setSelectedContact(active);
+
+    const { error } = await supabase
+      .from("contacts")
+      .update(toDbContact(active))
+      .eq("id", id);
+
+    if (error) alert(error.message);
   }
 
   async function summarizeCompany(company) {
@@ -344,19 +426,29 @@ function App() {
       return;
     }
 
-    const updated = companies.map((item) => {
-      if (item.id !== company.id) return item;
+    const updatedCompany = {
+      ...company,
+      description: data.summary,
+      automationLevel: data.automationFit,
+      roboticsUsage: data.buyerPersonas,
+      notes: data.outreachAngle
+    };
 
-      return {
-        ...item,
-        description: data.summary,
-        automationLevel: data.automationFit,
-        roboticsUsage: data.buyerPersonas,
-        notes: data.outreachAngle
-      };
-    });
+    const { error } = await supabase
+      .from("companies")
+      .update(toDbCompany(updatedCompany))
+      .eq("id", company.id);
 
-    setCompanies(updated);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setCompanies(
+      companies.map((item) =>
+        item.id === company.id ? updatedCompany : item
+      )
+    );
   }
 
   async function recommendFollowUp(contact) {
@@ -382,7 +474,17 @@ function App() {
     );
   }
 
-  function deleteContact(id) {
+  async function deleteContact(id) {
+    const { error } = await supabase
+      .from("contacts")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     const updated = contacts.filter((contact) => contact.id !== id);
     setContacts(updated);
 
@@ -391,20 +493,31 @@ function App() {
     }
   }
 
-  function deleteCompany(id) {
+  async function deleteCompany(id) {
+    const { error } = await supabase
+      .from("companies")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     setCompanies(companies.filter((company) => company.id !== id));
   }
 
-  function clearAllData() {
+  async function clearAllData() {
     const confirmed = window.confirm("Are you sure you want to clear all CRM data?");
 
     if (!confirmed) return;
 
+    await supabase.from("contacts").delete().neq("id", 0);
+    await supabase.from("companies").delete().neq("id", 0);
+
     setContacts([]);
     setCompanies([]);
     setSelectedContact(null);
-    localStorage.removeItem("foundationContacts");
-    localStorage.removeItem("foundationCompanies");
   }
 
   function exportExcel() {
@@ -421,6 +534,17 @@ function App() {
     XLSX.utils.book_append_sheet(workbook, metricsSheet, "Metrics");
 
     XLSX.writeFile(workbook, "foundation-crm.xlsx");
+  }
+
+  if (loading) {
+    return (
+      <div className="app">
+        <section className="card">
+          <h2>Loading Foundation CRM...</h2>
+          <p className="emptyText">Connecting to Supabase database.</p>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -440,7 +564,7 @@ function App() {
             Export Excel
           </button>
 
-          <p className="saveStatus">Auto-saved in browser</p>
+          <p className="saveStatus">Cloud-saved in Supabase</p>
 
           <button className="dangerButton" onClick={clearAllData}>
             Clear All Data
@@ -698,7 +822,7 @@ function App() {
               </div>
 
               <div className="timeline">
-                {selectedContact.timeline.map((item, index) => (
+                {(selectedContact.timeline || []).map((item, index) => (
                   <div className="timelineItem" key={index}>
                     <div className="dot"></div>
                     <div>
