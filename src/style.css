@@ -417,3 +417,18 @@ td select {
     grid-template-columns: 1fr;
   }
 }
+.miniButton {
+  margin-top: 8px;
+  border: none;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.miniButton:hover {
+  background: #dbeafe;
+}
