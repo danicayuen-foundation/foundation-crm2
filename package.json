@@ -6,13 +6,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "latest",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "lucide-react": "latest",
+    "openai": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest",
-    "xlsx": "latest",
-    "openai": "latest"
-    "@supabase/supabase-js": "latest"
+    "vite": "latest",
+    "xlsx": "latest"
   }
 }
