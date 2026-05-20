@@ -1,7 +1,16 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
-import { Plus, Download, Building2, Users, Reply, Clock } from "lucide-react";
+import {
+  Plus,
+  Download,
+  Building2,
+  Users,
+  Reply,
+  Clock,
+  Upload,
+  Sparkles
+} from "lucide-react";
 import "./style.css";
 
 const stages = [
@@ -18,6 +27,8 @@ const starterContacts = [
     name: "Jordan Lee",
     title: "VP Operations",
     company: "Magna International",
+    location: "",
+    linkedinUrl: "",
     status: "New Lead",
     outreachDate: "2026-05-20",
     responseDate: "",
@@ -52,11 +63,15 @@ function App() {
   const [companies, setCompanies] = useState(starterCompanies);
   const [selectedContact, setSelectedContact] = useState(starterContacts[0]);
   const [duplicateWarning, setDuplicateWarning] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
 
   const [newContact, setNewContact] = useState({
     name: "",
     title: "",
     company: "",
+    location: "",
+    linkedinUrl: "",
     status: "New Lead",
     outreachDate: today(),
     responseDate: "",
@@ -83,25 +98,43 @@ function App() {
     };
   }, [contacts, companies]);
 
-  function addContact() {
-    if (!newContact.name || !newContact.company) return;
+  function isDuplicate(contactData) {
+    return contacts.find((c) => {
+      const sameName =
+        c.name.toLowerCase().trim() === contactData.name.toLowerCase().trim();
 
-    const duplicate = contacts.find(
-      (c) =>
-        c.name.toLowerCase().trim() === newContact.name.toLowerCase().trim() &&
-        c.company.toLowerCase().trim() === newContact.company.toLowerCase().trim()
-    );
+      const sameCompany =
+        c.company.toLowerCase().trim() === contactData.company.toLowerCase().trim();
+
+      const sameLinkedin =
+        contactData.linkedinUrl &&
+        c.linkedinUrl &&
+        c.linkedinUrl.toLowerCase().trim() === contactData.linkedinUrl.toLowerCase().trim();
+
+      return sameLinkedin || (sameName && sameCompany);
+    });
+  }
+
+  function createContact(contactData, source) {
+    if (!contactData.name || !contactData.company) return;
+
+    const duplicate = isDuplicate(contactData);
 
     if (duplicate) {
       setDuplicateWarning("Possible duplicate detected: this contact already exists.");
+      setSelectedContact(duplicate);
       return;
     }
 
     const contact = {
-      ...newContact,
+      ...contactData,
       id: Date.now(),
+      status: contactData.status || "New Lead",
+      outreachDate: contactData.outreachDate || today(),
+      responseDate: contactData.responseDate || "",
+      followUpDate: contactData.followUpDate || "",
       timeline: [
-        { date: today(), action: "Contact added" },
+        { date: today(), action: source === "ai" ? "Contact created from LinkedIn screenshot" : "Contact added" },
         { date: today(), action: "Outreach started" }
       ]
     };
@@ -111,35 +144,103 @@ function App() {
     setDuplicateWarning("");
 
     const companyExists = companies.find(
-      (company) => company.name.toLowerCase() === newContact.company.toLowerCase()
+      (company) => company.name.toLowerCase() === contact.company.toLowerCase()
     );
 
     if (!companyExists) {
       setCompanies([
         {
           id: Date.now() + 1,
-          name: newContact.company,
+          name: contact.company,
           description: "",
           industry: "Automotive Manufacturing",
           automationLevel: "",
           roboticsUsage: "",
           strategicFit: "",
-          notes: ""
+          notes: source === "ai" ? "Created automatically from LinkedIn screenshot." : ""
         },
         ...companies
       ]);
     }
+  }
+
+  function addContact() {
+    createContact(newContact, "manual");
 
     setNewContact({
       name: "",
       title: "",
       company: "",
+      location: "",
+      linkedinUrl: "",
       status: "New Lead",
       outreachDate: today(),
       responseDate: "",
       followUpDate: "",
       notes: ""
     });
+  }
+
+  async function handleScreenshotUpload(event) {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    setAiLoading(true);
+    setAiMessage("AI is reading the LinkedIn screenshot...");
+    setDuplicateWarning("");
+
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+      try {
+        const base64Image = reader.result;
+
+        const response = await fetch("/api/parse-linkedin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            image: base64Image
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "AI parsing failed");
+        }
+
+        const aiContact = {
+          name: data.name || "",
+          title: data.title || "",
+          company: data.company || "",
+          location: data.location || "",
+          linkedinUrl: data.linkedinUrl || "",
+          status: "New Lead",
+          outreachDate: today(),
+          responseDate: "",
+          followUpDate: "",
+          notes: data.notes || ""
+        };
+
+        if (!aiContact.name || !aiContact.company) {
+          setAiMessage("AI could not find enough info. Try a clearer LinkedIn screenshot.");
+          setAiLoading(false);
+          return;
+        }
+
+        createContact(aiContact, "ai");
+        setAiMessage("LinkedIn screenshot parsed and contact added.");
+      } catch (error) {
+        setAiMessage(error.message);
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    reader.readAsDataURL(file);
   }
 
   function addCompany() {
@@ -181,9 +282,11 @@ function App() {
   }
 
   function exportExcel() {
+    const cleanContacts = contacts.map(({ timeline, ...contact }) => contact);
+
     const workbook = XLSX.utils.book_new();
 
-    const contactsSheet = XLSX.utils.json_to_sheet(contacts);
+    const contactsSheet = XLSX.utils.json_to_sheet(cleanContacts);
     const companiesSheet = XLSX.utils.json_to_sheet(companies);
     const metricsSheet = XLSX.utils.json_to_sheet([stats]);
 
@@ -218,9 +321,32 @@ function App() {
         <Metric icon={<Clock />} label="Follow-Ups Due" value={stats.followUpsDue} />
       </section>
 
+      <section className="card aiCard">
+        <div>
+          <p className="eyebrow">AI Screenshot Upload</p>
+          <h2>Upload LinkedIn Profile Screenshot</h2>
+          <p className="subtitle small">
+            Upload a screenshot and AI will extract the contact name, title, company, location, and notes.
+          </p>
+        </div>
+
+        <label className="uploadBox">
+          <Upload size={22} />
+          <span>{aiLoading ? "Reading screenshot..." : "Choose LinkedIn Screenshot"}</span>
+          <input type="file" accept="image/*" onChange={handleScreenshotUpload} />
+        </label>
+
+        {aiMessage && (
+          <div className="aiMessage">
+            <Sparkles size={16} />
+            {aiMessage}
+          </div>
+        )}
+      </section>
+
       <section className="mainGrid">
         <div className="card">
-          <h2>Add Contact</h2>
+          <h2>Add Contact Manually</h2>
 
           {duplicateWarning && <div className="warning">{duplicateWarning}</div>}
 
@@ -228,6 +354,8 @@ function App() {
             <input placeholder="Name" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
             <input placeholder="Title" value={newContact.title} onChange={(e) => setNewContact({ ...newContact, title: e.target.value })} />
             <input placeholder="Company" value={newContact.company} onChange={(e) => setNewContact({ ...newContact, company: e.target.value })} />
+            <input placeholder="Location" value={newContact.location} onChange={(e) => setNewContact({ ...newContact, location: e.target.value })} />
+            <input placeholder="LinkedIn URL" value={newContact.linkedinUrl} onChange={(e) => setNewContact({ ...newContact, linkedinUrl: e.target.value })} />
 
             <select value={newContact.status} onChange={(e) => setNewContact({ ...newContact, status: e.target.value })}>
               {stages.map((stage) => <option key={stage}>{stage}</option>)}
@@ -296,6 +424,8 @@ function App() {
                 <th>Name</th>
                 <th>Title</th>
                 <th>Company</th>
+                <th>Location</th>
+                <th>LinkedIn</th>
                 <th>Status</th>
                 <th>Outreach Date</th>
                 <th>Response Date</th>
@@ -310,6 +440,8 @@ function App() {
                   <td><input value={contact.name} onChange={(e) => updateContact(contact.id, "name", e.target.value)} /></td>
                   <td><input value={contact.title} onChange={(e) => updateContact(contact.id, "title", e.target.value)} /></td>
                   <td><input value={contact.company} onChange={(e) => updateContact(contact.id, "company", e.target.value)} /></td>
+                  <td><input value={contact.location} onChange={(e) => updateContact(contact.id, "location", e.target.value)} /></td>
+                  <td><input value={contact.linkedinUrl} onChange={(e) => updateContact(contact.id, "linkedinUrl", e.target.value)} /></td>
                   <td>
                     <select value={contact.status} onChange={(e) => updateContact(contact.id, "status", e.target.value)}>
                       {stages.map((stage) => <option key={stage}>{stage}</option>)}
