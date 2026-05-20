@@ -97,7 +97,7 @@ function App() {
   const [aiMessage, setAiMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [newContact, setNewContact] = useState({
     name: "",
@@ -536,16 +536,6 @@ function App() {
     XLSX.writeFile(workbook, "foundation-crm.xlsx");
   }
 
-  if (loading) {
-    return (
-      <div className="app">
-        <section className="card">
-          <h2>Loading Foundation CRM...</h2>
-          <p className="emptyText">Connecting to Supabase database.</p>
-        </section>
-      </div>
-    );
-  }
 
   return (
     <div className="app">
