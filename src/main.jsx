@@ -281,6 +281,60 @@ function App() {
     setSelectedContact(active);
   }
 
+  async function summarizeCompany(company) {
+    const response = await fetch("/api/summarize-company", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(company)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "Company summary failed");
+      return;
+    }
+
+    const updated = companies.map((item) => {
+      if (item.id !== company.id) return item;
+
+      return {
+        ...item,
+        description: data.summary,
+        automationLevel: data.automationFit,
+        roboticsUsage: data.buyerPersonas,
+        notes: data.outreachAngle
+      };
+    });
+
+    setCompanies(updated);
+  }
+
+  async function recommendFollowUp(contact) {
+    const response = await fetch("/api/recommend-followup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(contact)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "Follow-up recommendation failed");
+      return;
+    }
+
+    updateContact(
+      contact.id,
+      "notes",
+      `Recommended Action: ${data.recommendedAction}\n\nSuggested Message: ${data.followUpMessage}\n\nPriority: ${data.priority}`
+    );
+  }
+
   function exportExcel() {
     const cleanContacts = contacts.map(({ timeline, ...contact }) => contact);
 
@@ -450,7 +504,12 @@ function App() {
                   <td><input type="date" value={contact.outreachDate} onChange={(e) => updateContact(contact.id, "outreachDate", e.target.value)} /></td>
                   <td><input type="date" value={contact.responseDate} onChange={(e) => updateContact(contact.id, "responseDate", e.target.value)} /></td>
                   <td><input type="date" value={contact.followUpDate} onChange={(e) => updateContact(contact.id, "followUpDate", e.target.value)} /></td>
-                  <td><input value={contact.notes} onChange={(e) => updateContact(contact.id, "notes", e.target.value)} /></td>
+                  <td>
+                    <input value={contact.notes} onChange={(e) => updateContact(contact.id, "notes", e.target.value)} />
+                    <button className="miniButton" onClick={() => recommendFollowUp(contact)}>
+                      AI Follow-Up
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -473,6 +532,10 @@ function App() {
                   <span>{company.strategicFit || "Fit TBD"}</span>
                 </div>
                 <small>{company.notes}</small>
+
+                <button className="miniButton" onClick={() => summarizeCompany(company)}>
+                  AI Company Summary
+                </button>
               </div>
             ))}
           </div>
