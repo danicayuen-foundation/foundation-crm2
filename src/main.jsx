@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
+import { supabase } from "./supabase";
 import {
   Plus,
   Download,
@@ -11,10 +12,7 @@ import {
   Upload,
   Sparkles
 } from "lucide-react";
-import { supabase } from "./supabase";
 import "./style.css";
-
-import { supabase } from "./supabase";
 
 const stages = [
   "New Lead",
