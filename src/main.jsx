@@ -89,7 +89,6 @@ function toDbCompany(company) {
 }
 
 function App() {
-  console.log("SUPABASE CONNECTED", supabase);
   const [contacts, setContacts] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
