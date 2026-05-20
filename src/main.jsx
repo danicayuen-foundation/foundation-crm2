@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
 import {
@@ -88,6 +88,24 @@ function App() {
     strategicFit: "",
     notes: ""
   });
+
+  useEffect(() => {
+  const savedContacts = localStorage.getItem("foundationContacts");
+  const savedCompanies = localStorage.getItem("foundationCompanies");
+
+  if (savedContacts) {
+    setContacts(JSON.parse(savedContacts));
+  }
+
+  if (savedCompanies) {
+    setCompanies(JSON.parse(savedCompanies));
+  }
+}, []);
+
+useEffect(() => {
+  localStorage.setItem("foundationContacts", JSON.stringify(contacts));
+  localStorage.setItem("foundationCompanies", JSON.stringify(companies));
+}, [contacts, companies]);
 
   const stats = useMemo(() => {
     return {
@@ -248,15 +266,17 @@ function App() {
 
     setCompanies([{ ...newCompany, id: Date.now() }, ...companies]);
 
-    setNewCompany({
-      name: "",
-      description: "",
-      industry: "Automotive Manufacturing",
-      automationLevel: "",
-      roboticsUsage: "",
-      strategicFit: "",
-      notes: ""
-    });
+   setNewCompany({
+  name: "",
+  website: "",
+  description: "",
+  industry: "Automotive Manufacturing",
+  automationLevel: "",
+  roboticsUsage: "",
+  strategicFit: "",
+  notes: ""
+});
+    
   }
 
   function updateContact(id, field, value) {
@@ -335,6 +355,30 @@ function App() {
     );
   }
 
+  function deleteContact(id) {
+  const updated = contacts.filter((contact) => contact.id !== id);
+  setContacts(updated);
+
+  if (selectedContact?.id === id) {
+    setSelectedContact(updated[0] || null);
+  }
+}
+
+function deleteCompany(id) {
+  setCompanies(companies.filter((company) => company.id !== id));
+}
+
+function clearAllData() {
+  const confirmed = window.confirm("Are you sure you want to clear all CRM data?");
+
+  if (!confirmed) return;
+
+  setContacts([]);
+  setCompanies([]);
+  setSelectedContact(null);
+  localStorage.removeItem("foundationContacts");
+  localStorage.removeItem("foundationCompanies");
+}
   function exportExcel() {
     const cleanContacts = contacts.map(({ timeline, ...contact }) => contact);
 
@@ -362,10 +406,18 @@ function App() {
           </p>
         </div>
 
-        <button className="primaryButton" onClick={exportExcel}>
-          <Download size={18} />
-          Export Excel
-        </button>
+        <div>
+  <button className="primaryButton" onClick={exportExcel}>
+    <Download size={18} />
+    Export Excel
+  </button>
+
+  <p className="saveStatus">Auto-saved in browser</p>
+
+  <button className="dangerButton" onClick={clearAllData}>
+    Clear All Data
+  </button>
+</div>
       </header>
 
       <section className="tickerGrid">
@@ -504,12 +556,17 @@ function App() {
                   <td><input type="date" value={contact.outreachDate} onChange={(e) => updateContact(contact.id, "outreachDate", e.target.value)} /></td>
                   <td><input type="date" value={contact.responseDate} onChange={(e) => updateContact(contact.id, "responseDate", e.target.value)} /></td>
                   <td><input type="date" value={contact.followUpDate} onChange={(e) => updateContact(contact.id, "followUpDate", e.target.value)} /></td>
-                  <td>
-                    <input value={contact.notes} onChange={(e) => updateContact(contact.id, "notes", e.target.value)} />
-                    <button className="miniButton" onClick={() => recommendFollowUp(contact)}>
-                      AI Follow-Up
-                    </button>
-                  </td>
+                 <td>
+  <input value={contact.notes} onChange={(e) => updateContact(contact.id, "notes", e.target.value)} />
+
+  <button className="miniButton" onClick={() => recommendFollowUp(contact)}>
+    AI Follow-Up
+  </button>
+
+  <button className="dangerButton" onClick={() => deleteContact(contact.id)}>
+    Delete
+  </button>
+</td>
                 </tr>
               ))}
             </tbody>
@@ -536,6 +593,10 @@ function App() {
                 <button className="miniButton" onClick={() => summarizeCompany(company)}>
                   AI Company Summary
                 </button>
+                
+                <button className="dangerButton" onClick={() => deleteCompany(company.id)}>
+  Delete Company
+</button>
               </div>
             ))}
           </div>
